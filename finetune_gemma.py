@@ -1,5 +1,6 @@
+import json
 import torch
-from datasets import load_dataset
+from datasets import load_from_disk
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -10,12 +11,15 @@ from peft import LoraConfig, get_peft_model
 from trl import SFTTrainer
 
 def main():
-    # 1. Configuration
-    model_name = "google/gemma-2b-it"  # Can also use 7b
-    dataset_name = "glaiveai/glaive-function-calling-v2" # Example function calling dataset
-    output_dir = "./gemma-function-calling-lora"
+    # 1. Load Configuration
+    print("Loading configuration...")
+    with open("training_config.json", "r") as f:
+        config = json.load(f)
+
+    model_name = config["model_name"]
+    output_dir = config["output_dir"]
     
-    # 2. BitsAndBytes Config for 4-bit quantization (QoRA)
+    # 2. Config & Tokenizer
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
@@ -23,7 +27,7 @@ def main():
         bnb_4bit_use_double_quant=True,
     )
     
-    # 3. Load Model and Tokenizer
+    print(f"Loading tokenizer and model ({model_name})...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.padding_side = 'right'
     
@@ -33,12 +37,12 @@ def main():
         device_map="auto",
     )
     
-    # 4. LoRA Configuration
+    # 3. LoRA
     lora_config = LoraConfig(
-        r=16,
-        lora_alpha=32,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-        lora_dropout=0.05,
+        r=config["lora_r"],
+        lora_alpha=config["lora_alpha"],
+        target_modules=config["target_modules"],
+        lora_dropout=config["lora_dropout"],
         bias="none",
         task_type="CAUSAL_LM",
     )
@@ -46,58 +50,49 @@ def main():
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
     
-    # 5. Load and process Dataset
-    # Here we are just loading a standard function calling dataset. 
-    # You might need to preprocess it to match Gemma's chat template.
-    dataset = load_dataset(dataset_name, split="train[:5000]") # Subset for faster Colab testing
+    # 4. Load Processed Dataset
+    print("Loading prepared dataset...")
+    dataset_train = load_from_disk("./data/train")
     
-    def format_prompt(sample):
-        # This is a highly simplified prompt format for function calling
-        # You should adapt this to your exact function calling prompt format
-        system_prompt = sample.get('system', '')
-        chat = sample.get('chat', '')
-        text = f"<bos><start_of_turn>user\n{system_prompt}\n{chat}<end_of_turn>\n<start_of_turn>model\n"
-        return {"text": text}
-        
-    dataset = dataset.map(format_prompt)
-    
-    # 6. Training Arguments
+    # 5. Training
     training_args = TrainingArguments(
         output_dir=output_dir,
-        per_device_train_batch_size=2,
-        gradient_accumulation_steps=4,
-        optim="paged_adamw_32bit",
+        per_device_train_batch_size=config["per_device_train_batch_size"],
+        gradient_accumulation_steps=config["gradient_accumulation_steps"],
+        optim=config["optim"],
         save_steps=100,
         logging_steps=10,
-        learning_rate=2e-4,
+        learning_rate=config["learning_rate"],
         weight_decay=0.001,
         fp16=True,
         max_grad_norm=0.3,
-        max_steps=500, # adjust based on your needs
-        warmup_ratio=0.03,
+        max_steps=config["max_steps"],
+        warmup_ratio=config["warmup_ratio"],
         group_by_length=True,
         lr_scheduler_type="cosine",
         report_to="tensorboard",
     )
     
-    # 7. SFT Trainer
+    print("Initializing trainer...")
     trainer = SFTTrainer(
         model=model,
-        train_dataset=dataset,
+        train_dataset=dataset_train,
         peft_config=lora_config,
         dataset_text_field="text",
-        max_seq_length=1024,
+        max_seq_length=config["max_seq_length"],
         tokenizer=tokenizer,
         args=training_args,
     )
     
-    # 8. Train!
+    # 6. Train!
+    print("Starting training!")
     trainer.train()
     
-    # 9. Save the model
+    # 7. Save
+    print(f"Saving model to {output_dir}")
     trainer.model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
-    print("Training complete! Model saved to", output_dir)
+    print("Training complete!")
 
 if __name__ == "__main__":
     main()
