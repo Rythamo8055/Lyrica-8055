@@ -1,10 +1,7 @@
-# Core Unsloth dependencies
-unsloth
-trl
+# Dependencies for Google Colab
+transformers
 peft
+trl
 accelerate
 bitsandbytes
-transformers
 datasets
-huggingface_hub
-hf_transfer
