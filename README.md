@@ -1,51 +1,31 @@
-# Gemma Function Calling Fine-Tuning
+# Android Mobile Actions - FunctionGemma Fine-Tuning
 
-This repository follows the **Fine-Tuning Expert** guidelines to train a Google Gemma model for function-calling capabilities using Google Colab. The pipeline separates dataset preparation, training configuration, training execution, and evaluation.
+This repository configures an **[Unsloth](https://github.com/unslothai/unsloth) pipeline** to extremely fast fine-tune `unsloth/functiongemma-270m-it` (a 270M parameter Gemma 3 model optimized for mobile deployment). 
+
+We are training this tiny, efficient model on our custom Android system dataset (`dataset.jsonl`) to convert natural language (e.g., `"set a timer for 30 seconds called quick"`) into explicit Android mobile action commands (`call:set_timer{seconds:30,label:quick}`).
 
 ## Getting Started in Google Colab
 
-1. Open [Google Colab](https://colab.research.google.com/) and select a **T4 GPU** runtime.
-2. Clone this repository in the first cell of your Colab notebook:
+The easiest way to run this is inside a Google Colab notebook.
+
+1. Open [Google Colab](https://colab.research.google.com/) and select an **L4 or T4 GPU**.
+2. Run the following to install `unsloth` and clone this repository:
 
 ```bash
+!pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+!pip install --no-deps xformers "trl<0.9.0" peft accelerate bitsandbytes
 !git clone https://github.com/Rythamo8055/Lyrica-8055.git
 %cd Lyrica-8055
 ```
 
-3. Install the required dependencies:
+3. Ensure your custom dataset is mapped accurately in `./Fine tune DATA/dataset.jsonl`.
+4. Run the Unsloth end-to-end training pipeline!
 
 ```bash
-!pip install -r requirements.txt
+!python unsloth_functiongemma_train.py
 ```
 
-4. Authenticate with Hugging Face (Required to download Gemma models):
-
-```python
-from huggingface_hub import notebook_login
-notebook_login()
-```
-
-## The Fine-Tuning Pipeline
-
-### 1. Dataset Preparation & Validation
-First, format and validate your instruction data:
-```bash
-!python dataset_prep.py
-```
-*This script will format the dataset to match the Gemma structural prompt and split it into training and testing sets, saving them to `./data`.*
-
-### 2. Configuration
-The hyperparameters and structural specs (LoRA config, batch size, learning rate) are detached from the code. Adjust parameters in **`training_config.json`**.
-
-### 3. Model Training (PEFT/LoRA)
-Execute the fine-tuning process using 4-bit quantization (QLoRA):
-```bash
-!python finetune_gemma.py
-```
-*This script loads the pre-processed data and configurations, logs progress, and saves the fine-tuned LoRA adapter.*
-
-### 4. Evaluation & Benchmarking
-Finally, test your model on the unseen test split to evaluate accuracy and inference time:
-```bash
-!python evaluate.py
-```
+## Why Unsloth FunctionGemma?
+- **Speed**: Unsloth provides 2x-5x faster training speeds and vastly decreases VRAM usage.
+- **Mobile Deployment Ready**: The `270M` parameter model size means we can easily export it to GGUF and run it directly on a Pixel or iPhone device natively with ~50 tokens/s using `llama.cpp` or ExecuTorch.
+- **Function Calling**: This specific model heavily favors structure logic out-of-the-box, making it trivial for it to learn mapping user commands to structural calls.
