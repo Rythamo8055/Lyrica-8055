@@ -4,9 +4,20 @@ FunctionGemma Fine-Tuning for Android Mobile Actions
 Uses standard HuggingFace Transformers + PEFT + TRL.
 Works reliably on Google Colab Free Tier (T4 GPU).
 """
+import os
+import sys
 import json
 import torch
+from pathlib import Path
 from datasets import Dataset
+
+# ---------------------------------------------------------
+# Auto-detect script location and cd into the repo
+# This ensures paths work no matter where you run from
+# ---------------------------------------------------------
+SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(SCRIPT_DIR)
+print(f"📁 Working directory: {SCRIPT_DIR}")
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
