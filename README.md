@@ -12,8 +12,7 @@ The easiest way to run this is inside a Google Colab notebook.
 2. Run the following to install `unsloth` and clone this repository:
 
 ```bash
-!pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
-!pip install --no-deps xformers "trl<0.9.0" peft accelerate bitsandbytes
+!pip install unsloth
 !git clone https://github.com/Rythamo8055/Lyrica-8055.git
 %cd Lyrica-8055
 ```
